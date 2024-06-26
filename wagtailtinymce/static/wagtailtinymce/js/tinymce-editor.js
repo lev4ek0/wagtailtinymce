@@ -27,16 +27,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 'use strict';
 
-var mcePlugins = ['hr', 'code', 'fullscreen', 'noneditable', 'paste', 'table'],
+var mcePlugins = ['code', 'fullscreen', 'table', 'image', 'link', 'media', 'lists'],
     mceTools = ['inserttable'],
     mceExternalPlugins = {};
 
 function registerMCEPlugin(name, path, language) {
     if (path) {
         mceExternalPlugins[name] = path;
-        if (language) {
-            tinymce.PluginManager.requireLangPack(name, language);
-        }
     } else {
         mcePlugins.push(name);
     }

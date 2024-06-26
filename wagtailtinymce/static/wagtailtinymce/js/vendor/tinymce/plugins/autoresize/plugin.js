@@ -1,162 +1,192 @@
 /**
- * plugin.js
- *
- * Released under LGPL License.
- * Copyright (c) 1999-2015 Ephox Corp. All rights reserved
- *
- * License: http://www.tinymce.com/license
- * Contributing: http://www.tinymce.com/contributing
+ * TinyMCE version 6.8.4 (2024-06-19)
  */
 
-/*global tinymce:true */
-/*eslint no-nested-ternary:0 */
+(function () {
+    'use strict';
 
-/**
- * Auto Resize
- *
- * This plugin automatically resizes the content area to fit its content height.
- * It will retain a minimum height, which is the height of the content area when
- * it's initialized.
- */
-tinymce.PluginManager.add('autoresize', function(editor) {
-	var settings = editor.settings, oldSize = 0;
+    const Cell = initial => {
+      let value = initial;
+      const get = () => {
+        return value;
+      };
+      const set = v => {
+        value = v;
+      };
+      return {
+        get,
+        set
+      };
+    };
 
-	function isFullscreen() {
-		return editor.plugins.fullscreen && editor.plugins.fullscreen.isFullscreen();
-	}
+    var global$1 = tinymce.util.Tools.resolve('tinymce.PluginManager');
 
-	if (editor.settings.inline) {
-		return;
-	}
+    const constant = value => {
+      return () => {
+        return value;
+      };
+    };
 
-	/**
-	 * This method gets executed each time the editor needs to resize.
-	 */
-	function resize(e) {
-		var deltaSize, doc, body, docElm, DOM = tinymce.DOM, resizeHeight, myHeight,
-			marginTop, marginBottom, paddingTop, paddingBottom, borderTop, borderBottom;
+    var global = tinymce.util.Tools.resolve('tinymce.Env');
 
-		doc = editor.getDoc();
-		if (!doc) {
-			return;
-		}
+    const fireResizeEditor = editor => editor.dispatch('ResizeEditor');
 
-		body = doc.body;
-		docElm = doc.documentElement;
-		resizeHeight = settings.autoresize_min_height;
+    const option = name => editor => editor.options.get(name);
+    const register$1 = editor => {
+      const registerOption = editor.options.register;
+      registerOption('autoresize_overflow_padding', {
+        processor: 'number',
+        default: 1
+      });
+      registerOption('autoresize_bottom_margin', {
+        processor: 'number',
+        default: 50
+      });
+    };
+    const getMinHeight = option('min_height');
+    const getMaxHeight = option('max_height');
+    const getAutoResizeOverflowPadding = option('autoresize_overflow_padding');
+    const getAutoResizeBottomMargin = option('autoresize_bottom_margin');
 
-		if (!body || (e && e.type === "setcontent" && e.initial) || isFullscreen()) {
-			if (body && docElm) {
-				body.style.overflowY = "auto";
-				docElm.style.overflowY = "auto"; // Old IE
-			}
+    const isFullscreen = editor => editor.plugins.fullscreen && editor.plugins.fullscreen.isFullscreen();
+    const toggleScrolling = (editor, state) => {
+      const body = editor.getBody();
+      if (body) {
+        body.style.overflowY = state ? '' : 'hidden';
+        if (!state) {
+          body.scrollTop = 0;
+        }
+      }
+    };
+    const parseCssValueToInt = (dom, elm, name, computed) => {
+      var _a;
+      const value = parseInt((_a = dom.getStyle(elm, name, computed)) !== null && _a !== void 0 ? _a : '', 10);
+      return isNaN(value) ? 0 : value;
+    };
+    const shouldScrollIntoView = trigger => {
+      if ((trigger === null || trigger === void 0 ? void 0 : trigger.type.toLowerCase()) === 'setcontent') {
+        const setContentEvent = trigger;
+        return setContentEvent.selection === true || setContentEvent.paste === true;
+      } else {
+        return false;
+      }
+    };
+    const resize = (editor, oldSize, trigger, getExtraMarginBottom) => {
+      var _a;
+      const dom = editor.dom;
+      const doc = editor.getDoc();
+      if (!doc) {
+        return;
+      }
+      if (isFullscreen(editor)) {
+        toggleScrolling(editor, true);
+        return;
+      }
+      const docEle = doc.documentElement;
+      const resizeBottomMargin = getExtraMarginBottom ? getExtraMarginBottom() : getAutoResizeOverflowPadding(editor);
+      const minHeight = (_a = getMinHeight(editor)) !== null && _a !== void 0 ? _a : editor.getElement().offsetHeight;
+      let resizeHeight = minHeight;
+      const marginTop = parseCssValueToInt(dom, docEle, 'margin-top', true);
+      const marginBottom = parseCssValueToInt(dom, docEle, 'margin-bottom', true);
+      let contentHeight = docEle.offsetHeight + marginTop + marginBottom + resizeBottomMargin;
+      if (contentHeight < 0) {
+        contentHeight = 0;
+      }
+      const containerHeight = editor.getContainer().offsetHeight;
+      const contentAreaHeight = editor.getContentAreaContainer().offsetHeight;
+      const chromeHeight = containerHeight - contentAreaHeight;
+      if (contentHeight + chromeHeight > minHeight) {
+        resizeHeight = contentHeight + chromeHeight;
+      }
+      const maxHeight = getMaxHeight(editor);
+      if (maxHeight && resizeHeight > maxHeight) {
+        resizeHeight = maxHeight;
+        toggleScrolling(editor, true);
+      } else {
+        toggleScrolling(editor, false);
+      }
+      if (resizeHeight !== oldSize.get()) {
+        const deltaSize = resizeHeight - oldSize.get();
+        dom.setStyle(editor.getContainer(), 'height', resizeHeight + 'px');
+        oldSize.set(resizeHeight);
+        fireResizeEditor(editor);
+        if (global.browser.isSafari() && (global.os.isMacOS() || global.os.isiOS())) {
+          const win = editor.getWin();
+          win.scrollTo(win.pageXOffset, win.pageYOffset);
+        }
+        if (editor.hasFocus() && shouldScrollIntoView(trigger)) {
+          editor.selection.scrollIntoView();
+        }
+        if ((global.browser.isSafari() || global.browser.isChromium()) && deltaSize < 0) {
+          resize(editor, oldSize, trigger, getExtraMarginBottom);
+        }
+      }
+    };
+    const setup = (editor, oldSize) => {
+      let getExtraMarginBottom = () => getAutoResizeBottomMargin(editor);
+      let resizeCounter;
+      let sizeAfterFirstResize;
+      editor.on('init', e => {
+        resizeCounter = 0;
+        const overflowPadding = getAutoResizeOverflowPadding(editor);
+        const dom = editor.dom;
+        dom.setStyles(editor.getDoc().documentElement, { height: 'auto' });
+        if (global.browser.isEdge() || global.browser.isIE()) {
+          dom.setStyles(editor.getBody(), {
+            'paddingLeft': overflowPadding,
+            'paddingRight': overflowPadding,
+            'min-height': 0
+          });
+        } else {
+          dom.setStyles(editor.getBody(), {
+            paddingLeft: overflowPadding,
+            paddingRight: overflowPadding
+          });
+        }
+        resize(editor, oldSize, e, getExtraMarginBottom);
+        resizeCounter += 1;
+      });
+      editor.on('NodeChange SetContent keyup FullscreenStateChanged ResizeContent', e => {
+        if (resizeCounter === 1) {
+          sizeAfterFirstResize = editor.getContainer().offsetHeight;
+          resize(editor, oldSize, e, getExtraMarginBottom);
+          resizeCounter += 1;
+        } else if (resizeCounter === 2) {
+          const isLooping = sizeAfterFirstResize < editor.getContainer().offsetHeight;
+          if (isLooping) {
+            const dom = editor.dom;
+            const doc = editor.getDoc();
+            dom.setStyles(doc.documentElement, { 'min-height': 0 });
+            dom.setStyles(editor.getBody(), { 'min-height': 'inherit' });
+          }
+          getExtraMarginBottom = isLooping ? constant(0) : getExtraMarginBottom;
+          resizeCounter += 1;
+        } else {
+          resize(editor, oldSize, e, getExtraMarginBottom);
+        }
+      });
+    };
 
-			return;
-		}
+    const register = (editor, oldSize) => {
+      editor.addCommand('mceAutoResize', () => {
+        resize(editor, oldSize);
+      });
+    };
 
-		// Calculate outer height of the body element using CSS styles
-		marginTop = editor.dom.getStyle(body, 'margin-top', true);
-		marginBottom = editor.dom.getStyle(body, 'margin-bottom', true);
-		paddingTop = editor.dom.getStyle(body, 'padding-top', true);
-		paddingBottom = editor.dom.getStyle(body, 'padding-bottom', true);
-		borderTop = editor.dom.getStyle(body, 'border-top-width', true);
-		borderBottom = editor.dom.getStyle(body, 'border-bottom-width', true);
-		myHeight = body.offsetHeight + parseInt(marginTop, 10) + parseInt(marginBottom, 10) +
-			parseInt(paddingTop, 10) + parseInt(paddingBottom, 10) +
-			parseInt(borderTop, 10) + parseInt(borderBottom, 10);
+    var Plugin = () => {
+      global$1.add('autoresize', editor => {
+        register$1(editor);
+        if (!editor.options.isSet('resize')) {
+          editor.options.set('resize', false);
+        }
+        if (!editor.inline) {
+          const oldSize = Cell(0);
+          register(editor, oldSize);
+          setup(editor, oldSize);
+        }
+      });
+    };
 
-		// Make sure we have a valid height
-		if (isNaN(myHeight) || myHeight <= 0) {
-			// Get height differently depending on the browser used
-			myHeight = tinymce.Env.ie ? body.scrollHeight : (tinymce.Env.webkit && body.clientHeight === 0 ? 0 : body.offsetHeight);
-		}
+    Plugin();
 
-		// Don't make it smaller than the minimum height
-		if (myHeight > settings.autoresize_min_height) {
-			resizeHeight = myHeight;
-		}
-
-		// If a maximum height has been defined don't exceed this height
-		if (settings.autoresize_max_height && myHeight > settings.autoresize_max_height) {
-			resizeHeight = settings.autoresize_max_height;
-			body.style.overflowY = "auto";
-			docElm.style.overflowY = "auto"; // Old IE
-		} else {
-			body.style.overflowY = "hidden";
-			docElm.style.overflowY = "hidden"; // Old IE
-			body.scrollTop = 0;
-		}
-
-		// Resize content element
-		if (resizeHeight !== oldSize) {
-			deltaSize = resizeHeight - oldSize;
-			DOM.setStyle(editor.iframeElement, 'height', resizeHeight + 'px');
-			oldSize = resizeHeight;
-
-			// WebKit doesn't decrease the size of the body element until the iframe gets resized
-			// So we need to continue to resize the iframe down until the size gets fixed
-			if (tinymce.isWebKit && deltaSize < 0) {
-				resize(e);
-			}
-		}
-	}
-
-	/**
-	 * Calls the resize x times in 100ms intervals. We can't wait for load events since
-	 * the CSS files might load async.
-	 */
-	function wait(times, interval, callback) {
-		setTimeout(function() {
-			resize({});
-
-			if (times--) {
-				wait(times, interval, callback);
-			} else if (callback) {
-				callback();
-			}
-		}, interval);
-	}
-
-	// Define minimum height
-	settings.autoresize_min_height = parseInt(editor.getParam('autoresize_min_height', editor.getElement().offsetHeight), 10);
-
-	// Define maximum height
-	settings.autoresize_max_height = parseInt(editor.getParam('autoresize_max_height', 0), 10);
-
-	// Add padding at the bottom for better UX
-	editor.on("init", function() {
-		var overflowPadding, bottomMargin;
-
-		overflowPadding = editor.getParam('autoresize_overflow_padding', 1);
-		bottomMargin = editor.getParam('autoresize_bottom_margin', 50);
-
-		if (overflowPadding !== false) {
-			editor.dom.setStyles(editor.getBody(), {
-				paddingLeft: overflowPadding,
-				paddingRight: overflowPadding
-			});
-		}
-
-		if (bottomMargin !== false) {
-			editor.dom.setStyles(editor.getBody(), {
-				paddingBottom: bottomMargin
-			});
-		}
-	});
-
-	// Add appropriate listeners for resizing content area
-	editor.on("nodechange setcontent keyup FullscreenStateChanged", resize);
-
-	if (editor.getParam('autoresize_on_init', true)) {
-		editor.on('init', function() {
-			// Hit it 20 times in 100 ms intervals
-			wait(20, 100, function() {
-				// Hit it 5 times in 1 sec intervals
-				wait(5, 1000);
-			});
-		});
-	}
-
-	// Register the command so that it can be invoked by using tinyMCE.activeEditor.execCommand('mceExample');
-	editor.addCommand('mceAutoResize', resize);
-});
+})();

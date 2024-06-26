@@ -42,20 +42,21 @@ class TinyMCERichTextArea(WidgetWithScript, widgets.Textarea):
             'buttons': [
                 [
                     ['undo', 'redo'],
-                    ['styleselect'],
-                    ['bold', 'italic'],
+                    ['blocks', 'fontfamily', 'fontsize', 'lineheight'],
+                    ['fullscreen', 'removeformat'],
+                    ['bold', 'italic', 'strikethrough', 'superscript', 'subscript', 'forecolor', 'backcolor'],
+                    ['alignleft', 'aligncenter', 'alignright', 'alignjustify'],
                     ['bullist', 'numlist', 'outdent', 'indent'],
-                    ['table'],
-                    ['link', 'unlink'],
-                    ['wagtaildoclink', 'wagtailimage', 'wagtailembed'],
-                    ['pastetext', 'fullscreen'],
+                    ['hr', 'link', 'unlink', 'image', 'table', 'code'],
+                    # ['wagtaildoclink', 'wagtailimage', 'wagtailembed'],
                 ]
+
             ],
             'menus': False,
             'options': {
                 'browser_spellcheck': True,
                 'noneditable_leave_contenteditable': True,
-                'language': translation.to_locale(translation.get_language()),
+                'language': "ru",
                 'language_load': True,
             },
         }
@@ -63,8 +64,8 @@ class TinyMCERichTextArea(WidgetWithScript, widgets.Textarea):
     def __init__(self, attrs=None, **kwargs):
         super(TinyMCERichTextArea, self).__init__(attrs)
         self.kwargs = self.getDefaultArgs()
-        if kwargs is not None:
-            self.kwargs.update(kwargs)
+        if "options" in kwargs:
+            self.kwargs.update(kwargs["options"])
 
     def get_panel(self):
         return FieldPanel
