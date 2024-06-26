@@ -1,88 +1,117 @@
 /**
- * plugin.js
- *
- * Released under LGPL License.
- * Copyright (c) 1999-2015 Ephox Corp. All rights reserved
- *
- * License: http://www.tinymce.com/license
- * Contributing: http://www.tinymce.com/contributing
+ * TinyMCE version 6.8.4 (2024-06-19)
  */
 
-/*global tinymce:true */
+(function () {
+    'use strict';
 
-tinymce.PluginManager.add('pagebreak', function(editor) {
-	var pageBreakClass = 'mce-pagebreak', separatorHtml = editor.getParam('pagebreak_separator', '<!-- pagebreak -->');
+    var global$1 = tinymce.util.Tools.resolve('tinymce.PluginManager');
 
-	var pageBreakSeparatorRegExp = new RegExp(separatorHtml.replace(/[\?\.\*\[\]\(\)\{\}\+\^\$\:]/g, function(a) {
-		return '\\' + a;
-	}), 'gi');
+    var global = tinymce.util.Tools.resolve('tinymce.Env');
 
-	var pageBreakPlaceHolderHtml = '<img src="' + tinymce.Env.transparentSrc + '" class="' +
-		pageBreakClass + '" data-mce-resize="false" />';
+    const option = name => editor => editor.options.get(name);
+    const register$2 = editor => {
+      const registerOption = editor.options.register;
+      registerOption('pagebreak_separator', {
+        processor: 'string',
+        default: '<!-- pagebreak -->'
+      });
+      registerOption('pagebreak_split_block', {
+        processor: 'boolean',
+        default: false
+      });
+    };
+    const getSeparatorHtml = option('pagebreak_separator');
+    const shouldSplitBlock = option('pagebreak_split_block');
 
-	// Register commands
-	editor.addCommand('mcePageBreak', function() {
-		if (editor.settings.pagebreak_split_block) {
-			editor.insertContent('<p>' + pageBreakPlaceHolderHtml + '</p>');
-		} else {
-			editor.insertContent(pageBreakPlaceHolderHtml);
-		}
-	});
+    const pageBreakClass = 'mce-pagebreak';
+    const getPlaceholderHtml = shouldSplitBlock => {
+      const html = `<img src="${ global.transparentSrc }" class="${ pageBreakClass }" data-mce-resize="false" data-mce-placeholder />`;
+      return shouldSplitBlock ? `<p>${ html }</p>` : html;
+    };
+    const setup$1 = editor => {
+      const separatorHtml = getSeparatorHtml(editor);
+      const shouldSplitBlock$1 = () => shouldSplitBlock(editor);
+      const pageBreakSeparatorRegExp = new RegExp(separatorHtml.replace(/[\?\.\*\[\]\(\)\{\}\+\^\$\:]/g, a => {
+        return '\\' + a;
+      }), 'gi');
+      editor.on('BeforeSetContent', e => {
+        e.content = e.content.replace(pageBreakSeparatorRegExp, getPlaceholderHtml(shouldSplitBlock$1()));
+      });
+      editor.on('PreInit', () => {
+        editor.serializer.addNodeFilter('img', nodes => {
+          let i = nodes.length, node, className;
+          while (i--) {
+            node = nodes[i];
+            className = node.attr('class');
+            if (className && className.indexOf(pageBreakClass) !== -1) {
+              const parentNode = node.parent;
+              if (parentNode && editor.schema.getBlockElements()[parentNode.name] && shouldSplitBlock$1()) {
+                parentNode.type = 3;
+                parentNode.value = separatorHtml;
+                parentNode.raw = true;
+                node.remove();
+                continue;
+              }
+              node.type = 3;
+              node.value = separatorHtml;
+              node.raw = true;
+            }
+          }
+        });
+      });
+    };
 
-	// Register buttons
-	editor.addButton('pagebreak', {
-		title: 'Page break',
-		cmd: 'mcePageBreak'
-	});
+    const register$1 = editor => {
+      editor.addCommand('mcePageBreak', () => {
+        editor.insertContent(getPlaceholderHtml(shouldSplitBlock(editor)));
+      });
+    };
 
-	editor.addMenuItem('pagebreak', {
-		text: 'Page break',
-		icon: 'pagebreak',
-		cmd: 'mcePageBreak',
-		context: 'insert'
-	});
+    const setup = editor => {
+      editor.on('ResolveName', e => {
+        if (e.target.nodeName === 'IMG' && editor.dom.hasClass(e.target, pageBreakClass)) {
+          e.name = 'pagebreak';
+        }
+      });
+    };
 
-	editor.on('ResolveName', function(e) {
-		if (e.target.nodeName == 'IMG' && editor.dom.hasClass(e.target, pageBreakClass)) {
-			e.name = 'pagebreak';
-		}
-	});
+    const onSetupEditable = editor => api => {
+      const nodeChanged = () => {
+        api.setEnabled(editor.selection.isEditable());
+      };
+      editor.on('NodeChange', nodeChanged);
+      nodeChanged();
+      return () => {
+        editor.off('NodeChange', nodeChanged);
+      };
+    };
+    const register = editor => {
+      const onAction = () => editor.execCommand('mcePageBreak');
+      editor.ui.registry.addButton('pagebreak', {
+        icon: 'page-break',
+        tooltip: 'Page break',
+        onAction,
+        onSetup: onSetupEditable(editor)
+      });
+      editor.ui.registry.addMenuItem('pagebreak', {
+        text: 'Page break',
+        icon: 'page-break',
+        onAction,
+        onSetup: onSetupEditable(editor)
+      });
+    };
 
-	editor.on('click', function(e) {
-		e = e.target;
+    var Plugin = () => {
+      global$1.add('pagebreak', editor => {
+        register$2(editor);
+        register$1(editor);
+        register(editor);
+        setup$1(editor);
+        setup(editor);
+      });
+    };
 
-		if (e.nodeName === 'IMG' && editor.dom.hasClass(e, pageBreakClass)) {
-			editor.selection.select(e);
-		}
-	});
+    Plugin();
 
-	editor.on('BeforeSetContent', function(e) {
-		e.content = e.content.replace(pageBreakSeparatorRegExp, pageBreakPlaceHolderHtml);
-	});
-
-	editor.on('PreInit', function() {
-		editor.serializer.addNodeFilter('img', function(nodes) {
-			var i = nodes.length, node, className;
-
-			while (i--) {
-				node = nodes[i];
-				className = node.attr('class');
-				if (className && className.indexOf('mce-pagebreak') !== -1) {
-					// Replace parent block node if pagebreak_split_block is enabled
-					var parentNode = node.parent;
-					if (editor.schema.getBlockElements()[parentNode.name] && editor.settings.pagebreak_split_block) {
-						parentNode.type = 3;
-						parentNode.value = separatorHtml;
-						parentNode.raw = true;
-						node.remove();
-						continue;
-					}
-
-					node.type = 3;
-					node.value = separatorHtml;
-					node.raw = true;
-				}
-			}
-		});
-	});
-});
+})();

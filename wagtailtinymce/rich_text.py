@@ -24,6 +24,7 @@
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from __future__ import absolute_import, unicode_literals
+from copy import deepcopy
 
 import json
 
@@ -42,20 +43,21 @@ class TinyMCERichTextArea(WidgetWithScript, widgets.Textarea):
             'buttons': [
                 [
                     ['undo', 'redo'],
-                    ['styleselect'],
-                    ['bold', 'italic'],
+                    ['blocks', 'fontfamily', 'fontsize', 'lineheight'],
+                    ['fullscreen', 'removeformat'],
+                    ['bold', 'italic', 'strikethrough', 'superscript', 'subscript', 'forecolor', 'backcolor'],
+                    ['alignleft', 'aligncenter', 'alignright', 'alignjustify'],
                     ['bullist', 'numlist', 'outdent', 'indent'],
-                    ['table'],
-                    ['link', 'unlink'],
-                    ['wagtaildoclink', 'wagtailimage', 'wagtailembed'],
-                    ['pastetext', 'fullscreen'],
+                    ['hr', 'link', 'unlink', 'image', 'table', 'code'],
+                    # ['wagtaildoclink', 'wagtailimage', 'wagtailembed'],
                 ]
+
             ],
             'menus': False,
             'options': {
                 'browser_spellcheck': True,
                 'noneditable_leave_contenteditable': True,
-                'language': translation.to_locale(translation.get_language()),
+                'language': "ru",
                 'language_load': True,
             },
         }
@@ -63,8 +65,8 @@ class TinyMCERichTextArea(WidgetWithScript, widgets.Textarea):
     def __init__(self, attrs=None, **kwargs):
         super(TinyMCERichTextArea, self).__init__(attrs)
         self.kwargs = self.getDefaultArgs()
-        if kwargs is not None:
-            self.kwargs.update(kwargs)
+        if "options" in kwargs:
+            self.kwargs.update(kwargs["options"])
 
     def get_panel(self):
         return FieldPanel
@@ -77,9 +79,7 @@ class TinyMCERichTextArea(WidgetWithScript, widgets.Textarea):
         return super(TinyMCERichTextArea, self).render(name, translated_value, attrs)
 
     def render_js_init(self, id_, name, value):
-        kwargs = {
-            'options': self.kwargs.get('options', {}),
-        }
+        kwargs = deepcopy(self.kwargs)
 
         if 'buttons' in self.kwargs:
             if self.kwargs['buttons'] is False:
@@ -89,12 +89,14 @@ class TinyMCERichTextArea(WidgetWithScript, widgets.Textarea):
                     ' | '.join([' '.join(groups) for groups in rows])
                     for rows in self.kwargs['buttons']
                 ]
+            del kwargs["buttons"]
 
         if 'menus' in self.kwargs:
             if self.kwargs['menus'] is False:
                 kwargs['menubar'] = False
             else:
                 kwargs['menubar'] = ' '.join(self.kwargs['menus'])
+            del kwargs["menus"]
 
         return "makeTinyMCEEditable({0}, {1});".format(json.dumps(id_), json.dumps(kwargs))
 
