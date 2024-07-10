@@ -71,12 +71,12 @@ class TinyMCERichTextArea(WidgetWithScript, widgets.Textarea):
     def get_panel(self):
         return FieldPanel
 
-    def render(self, name, value, attrs=None):
+    def render(self, name, value, attrs=None, renderer=None):
         if value is None:
             translated_value = None
         else:
-            translated_value = expand_db_html(value, for_editor=True)
-        return super(TinyMCERichTextArea, self).render(name, translated_value, attrs)
+            translated_value = expand_db_html(value)
+        return super(TinyMCERichTextArea, self).render(name, translated_value, attrs, renderer)
 
     def render_js_init(self, id_, name, value):
         kwargs = deepcopy(self.kwargs)
